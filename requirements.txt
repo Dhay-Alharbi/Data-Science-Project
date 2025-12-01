@@ -1,8 +1,9 @@
-streamlit==1.30.0
-pandas>=2.0.3,<2.2
-numpy>=1.24,<1.26
+streamlit
+pandas
+numpy
+scikit-learn
 matplotlib
 seaborn
-scikit-learn
+openpyxl
 kagglehub
-openpyxl>=3.1.2
+scipy
