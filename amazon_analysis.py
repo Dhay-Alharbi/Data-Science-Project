@@ -13,6 +13,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from sklearn.metrics import silhouette_score, davies_bouldin_score
+import openpyxl
 
 # Global color palette for consistent styling
 GLOBAL_COLORS = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F8B739', '#A8E6CF']
@@ -48,7 +49,8 @@ def load_kaggle_dataset(dataset_id, csv_name, excel_name="output.xlsx"):
     
     # Save Excel
     excel_path = os.path.join(os.getcwd(), excel_name)
-    df.to_excel(excel_path, index=False)
+    df.to_excel(excel_path, index=False, engine="openpyxl")
+
     print(f"Excel saved: {excel_path}")
     
     return df, extract_path, excel_path
@@ -134,7 +136,7 @@ def clean_amazon_data(df):
     
     # Save cleaned data
     excel_path = os.path.join(os.getcwd(), "amazon_cleaned.xlsx")
-    df.to_excel(excel_path, index=False)
+    df.to_excel(excel_path, index=False,engine="openpyxl")
     print(f"Cleaned data saved: {excel_path}")
     
     return df
@@ -1039,4 +1041,5 @@ if __name__ == "__main__":
     
     print("✓ CLUSTERING ANALYSIS COMPLETE")    
     input("\nPress Enter to close all plots and exit...")
+
     plt.close('all')
