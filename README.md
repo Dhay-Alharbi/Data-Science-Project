@@ -1,73 +1,59 @@
-Amazon Sales Analytics Dashboard
+# 🛒 Amazon Sales Analytics Dashboard
+A fully interactive **Streamlit dashboard** that analyzes the Amazon Sales Dataset from Kaggle.  
+Includes data cleaning, EDA, customer segmentation, collaborative filtering recommendations, and interactive visualizations.
 
-A fully interactive Streamlit dashboard that analyzes the Amazon Sales Dataset from Kaggle.
-The dashboard provides data cleaning, EDA, customer segmentation, collaborative filtering recommendations, and interactive visualizations
+---
 
- Features
-1 Dataset Overview
+## ⭐ Features
 
-Displays dataset features, structure, and source.
+### 1️⃣ Dataset Overview
+- Shows dataset structure and metadata  
+- Includes cleaning + preprocessing with custom functions
 
-Cleaned and processed using custom functions.
+### 2️⃣ Data Preview
+- Displays the first 100 rows  
+- Prices, ratings, and discounts are formatted for clarity
 
-2. Data Preview
+### 3️⃣ Summary Statistics
+**Numerical statistics:**  
+- Mean, median, skewness, missing values  
 
-View first 100 rows with formatted prices, ratings, and discount values.
+**Categorical statistics:**  
+- Unique users  
+- Unique products  
+- Unique categories  
+- Unique reviews  
 
-3. Summary Statistics
+### 4️⃣ Interactive Visualizations
+Includes filters for:  
+- Category  
+- Price range  
+- Discount %  
+- Rating  
 
-Numerical summary (mean, median, skewness, missing values).
+Visual insights generated:  
+- Category distribution  
+- Discount impact on ratings  
+- Customer behavior patterns  
+- Customer segmentation (PCA + cluster sizes)
 
-Categorical summary (unique users, products, reviews).
+### 5️⃣ Product Recommendation System
+Uses **Collaborative Filtering** with:  
+- User–item matrix  
+- Cosine similarity  
+- Top-N recommendations
 
-4. Interactive Visualizations
+### 6️⃣ Insight Section
+Summarizes insights on:  
+- Category performance  
+- Discount behavior  
+- Customer segments (Loyal Customers, Discount Chasers, etc.)
 
-Includes filters for:
-✔ Category
-✔ Price range
-✔ Discount %
-✔ Rating
+---
 
-Provides visual insights such as:
-
-Category distribution
-
-Impact of discounts on ratings
-
-Customer behavior patterns
-
-Customer segmentation (PCA visualization + cluster size distribution)
-
-5. Product Recommendation System
-
-Uses Collaborative Filtering to recommend products based on user similarity.
-Includes:
-
-User–item matrix
-
-Cosine similarity
-
-Top‐N recommendations
-
-6. Insight Section
-
-Contains summarized insights about:
-
-Category performance
-
-Discount behavior
-
-Customer segments (Loyal Customers, Discount Chasers, etc.)
-
-
-
-Dependencies:
-streamlit – for interactive UI
-
-pandas, numpy – data manipulation
-
-matplotlib, seaborn – visualizations
-
-scikit-learn – PCA, KMeans, scaling
-
-kagglehub (if dataset is downloaded automatically)
+## 📦 Dependencies
+- `streamlit` – UI  
+- `pandas`, `numpy` – data manipulation  
+- `matplotlib`, `seaborn` – visualizations  
+- `scikit-learn` – PCA, KMeans clustering, scaling  
+- `kagglehub` – dataset download
