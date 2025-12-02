@@ -608,7 +608,6 @@ def batch_recommend(user_ids, user_item_matrix, similarity_df, n_recommendations
     return all_recommendations
 
 
-
 def prepare_customer_features(df):
     """Prepare customer-level features for clustering"""
     print("\n" + "="*80)
@@ -713,7 +712,6 @@ def perform_kmeans_clustering(customer_features, n_clusters=4):
     print(customer_features['cluster_name'].value_counts())
     
     return customer_features, X_scaled, scaler
-
 
 def interpret_clusters(cluster_profiles, customer_features):
     """Interpret cluster characteristics and assign meaningful names"""
@@ -890,9 +888,9 @@ def visualize_clusters_enhanced(customer_features, X_scaled):
     plt.show(block=False)
     print("\n✓ Visualization saved as 'customer_clusters_visualization.png'")
     
-    return pca
+    return pca 
 
-def create_cluster_summary_chart(customer_features):
+def create_clduster_summary_chart(customer_features):
     """Create a detailed cluster profile heatmap"""
     # Calculate cluster profiles with cluster names (without product_count)
     if 'cluster_name' in customer_features.columns:
@@ -1027,4 +1025,5 @@ if __name__ == "__main__":
     input("\nPress Enter to close all plots and exit...")
 
     plt.close('all')
+
 
