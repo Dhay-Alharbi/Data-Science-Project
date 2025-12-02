@@ -607,6 +607,29 @@ def batch_recommend(user_ids, user_item_matrix, similarity_df, n_recommendations
     
     return all_recommendations
 
+def create_cluster_summary_chart(customer_features):
+    """Create a detailed cluster profile heatmap"""
+    # Calculate cluster profiles with cluster names (without product_count)
+    if 'cluster_name' in customer_features.columns:
+        cluster_profiles = customer_features.groupby('cluster_name').agg({
+            'review_count': 'mean',
+            'avg_rating': 'mean',
+            'avg_price': 'mean',
+            'total_spending': 'mean',
+            'spending_per_review': 'mean',
+            'avg_discount_pct': 'mean',
+            'repeat_buyer': 'mean'
+        })
+    else:
+        cluster_profiles = customer_features.groupby('cluster_kmeans').agg({
+            'review_count': 'mean',
+            'avg_rating': 'mean',
+            'avg_price': 'mean',
+            'total_spending': 'mean',
+            'spending_per_review': 'mean',
+            'avg_discount_pct': 'mean',
+            'repeat_buyer': 'mean'
+        })
 
 def prepare_customer_features(df):
     """Prepare customer-level features for clustering"""
@@ -1025,5 +1048,6 @@ if __name__ == "__main__":
     input("\nPress Enter to close all plots and exit...")
 
     plt.close('all')
+
 
 
