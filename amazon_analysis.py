@@ -659,12 +659,12 @@ def prepare_customer_features(df):
     return customer_features
 
 def perform_kmeans_clustering(customer_features, n_clusters=4):
-    """Perform K-Means clustering on customers with balanced approach"""
+    """Perform K-Means clustering with one-time buyers correctly labeled"""
     print("\n" + "="*80)
-    print(f"K-MEANS CLUSTERING (k={n_clusters})")
+    print(f"K-MEANS CLUSTERING (k={n_clusters}, FIXED ONE-TIME BUYERS)")
     print("="*80)
     
-    # Select features for clustering (removed product_count)
+    # Features for clustering
     feature_cols = [
         'review_count', 'avg_rating', 'log_price', 'log_spending', 
         'avg_discount_pct', 'repeat_buyer', 'discount_seeker', 
@@ -676,58 +676,44 @@ def perform_kmeans_clustering(customer_features, n_clusters=4):
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
     
-    # Apply K-Means with sample weights to handle imbalance
-    # Give more weight to repeat buyers to balance the clustering
-    sample_weights = np.where(customer_features['repeat_buyer'] == 1, 2.0, 1.0)
-    
+    # Apply K-Means
     kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=30, max_iter=500)
-    customer_features['cluster_kmeans'] = kmeans.fit_predict(X_scaled, sample_weight=sample_weights)
+    customer_features['cluster_kmeans'] = kmeans.fit_predict(X_scaled)
     
-    # Calculate metrics
-    from sklearn.metrics import calinski_harabasz_score
+    # --- OVERRIDE ONE-TIME BUYERS ---
+    # Copy K-Means clusters
+    customer_features['cluster_name'] = customer_features['cluster_kmeans'].copy()
+    
+    # Force all one-time buyers into their own cluster
+    customer_features.loc[customer_features['review_count'] == 1, 'cluster_name'] = 'One-Time Buyers'
+    
+    # Map remaining clusters for repeat buyers
+    remaining_clusters = customer_features.loc[customer_features['cluster_name'] != 'One-Time Buyers', 'cluster_kmeans'].unique()
+    cluster_mapping = {}
+    for i, cluster_id in enumerate(remaining_clusters):
+        if i == 0:
+            cluster_mapping[cluster_id] = 'Loyal Customers'
+        elif i == 1:
+            cluster_mapping[cluster_id] = 'Discount Chasers'
+        else:
+            cluster_mapping[cluster_id] = 'Casual Shoppers'
+    
+    customer_features.loc[customer_features['cluster_name'] != 'One-Time Buyers', 'cluster_name'] = \
+        customer_features.loc[customer_features['cluster_name'] != 'One-Time Buyers', 'cluster_kmeans'].map(cluster_mapping)
+    
+    # --- Calculate clustering metrics ---
     silhouette = silhouette_score(X_scaled, customer_features['cluster_kmeans'])
     davies_bouldin = davies_bouldin_score(X_scaled, customer_features['cluster_kmeans'])
-    calinski = calinski_harabasz_score(X_scaled, customer_features['cluster_kmeans'])
+    print(f"\nClustering Metrics:")
+    print(f"Silhouette Score: {silhouette:.4f}")
+    print(f"Davies-Bouldin Index: {davies_bouldin:.4f}")
     
-    print("\n" + "="*80)
-    print(f"Clustering Metrics (k={n_clusters}):")
-    print("="*80)
-    print(f"Silhouette Score: {silhouette:.4f} (higher is better, range: -1 to 1)")
-    print(f"Davies-Bouldin Index: {davies_bouldin:.4f} (lower is better)")
-    print(f"Calinski-Harabasz Score: {calinski:.2f} (higher is better)")
-    print("="*80)
-    
-    # Cluster profiles
-    print("\n" + "="*80)
-    print("CLUSTER PROFILES")
-    print("="*80)
-    
-    cluster_profiles = customer_features.groupby('cluster_kmeans').agg({
-        'user_id': 'count',
-        'review_count': 'mean',
-        'avg_rating': 'mean',
-        'avg_price': 'mean',
-        'total_spending': 'mean',
-        'spending_per_review': 'mean',
-        'avg_discount_pct': 'mean',
-        'repeat_buyer': 'mean'
-    }).round(2)
-    
-    cluster_profiles.columns = [
-        'Customer_Count', 'Avg_Reviews', 'Avg_Rating', 'Avg_Price',
-        'Total_Spending', 'Spending/Review', 'Avg_Discount%', 'Repeat_Rate'
-    ]
-    
-    # Add percentage of total
-    total_customers = cluster_profiles['Customer_Count'].sum()
-    cluster_profiles['% of Total'] = (cluster_profiles['Customer_Count'] / total_customers * 100).round(1)
-    
-    print(cluster_profiles)
-    
-    # Interpret clusters
-    interpret_clusters(cluster_profiles, customer_features)
+    # Cluster profile counts
+    print("\nCluster Sizes:")
+    print(customer_features['cluster_name'].value_counts())
     
     return customer_features, X_scaled, scaler
+
 
 def interpret_clusters(cluster_profiles, customer_features):
     """Interpret cluster characteristics and assign meaningful names"""
@@ -830,7 +816,7 @@ plt.rcParams['xtick.labelsize'] = 9
 plt.rcParams['ytick.labelsize'] = 9
 
 def visualize_clusters_enhanced(customer_features, X_scaled):
-    """Enhanced cluster visualization with better insights"""
+    """Enhanced cluster visualization with correct one-time buyer counts"""
     print("\n" + "="*80)
     print("VISUALIZING CLUSTERS")
     print("="*80)
@@ -842,26 +828,31 @@ def visualize_clusters_enhanced(customer_features, X_scaled):
     customer_features['pca2'] = X_pca[:, 1]
     
     total_variance = pca.explained_variance_ratio_.sum()
-    print(f"\nExplained variance: PC1={pca.explained_variance_ratio_[0]:.1%}, PC2={pca.explained_variance_ratio_[1]:.1%}")
+    print(f"\nExplained variance: PC1={pca.explained_variance_ratio_[0]:.1%}, "
+          f"PC2={pca.explained_variance_ratio_[1]:.1%}")
     print(f"Total variance explained by 2 PCs: {total_variance:.2%}")
     
-    # Get unique cluster names and assign colors
-    unique_clusters = sorted(customer_features['cluster_kmeans'].unique())
-    colors = GLOBAL_COLORS
+    # Define colors and map cluster names
+    colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8']
+    cluster_names = customer_features['cluster_name'].unique()
+    color_map = {name: colors[i % len(colors)] for i, name in enumerate(cluster_names)}
     
-    # Create comprehensive visualization
+    # Create figure
     fig = plt.figure(figsize=(20, 12))
     gs = fig.add_gridspec(3, 3, hspace=0.3, wspace=0.3)
     
     # 1. PCA scatter plot (LARGE)
     ax1 = fig.add_subplot(gs[0:2, 0:2])
-    for cluster_id in unique_clusters:
-        cluster_data = customer_features[customer_features['cluster_kmeans'] == cluster_id]
-        cluster_name = cluster_data['cluster_name'].iloc[0] if 'cluster_name' in cluster_data.columns else f'Cluster {cluster_id}'
-        ax1.scatter(cluster_data['pca1'], cluster_data['pca2'],
-                   c=colors[cluster_id % len(colors)],
-                   label=f"{cluster_name} (C{cluster_id})",
-                   alpha=0.6, s=80, edgecolors='white', linewidth=0.5)
+    for cluster_name in cluster_names:
+        cluster_data = customer_features[customer_features['cluster_name'] == cluster_name]
+        if cluster_data.empty:
+            continue
+        ax1.scatter(
+            cluster_data['pca1'], cluster_data['pca2'],
+            c=color_map[cluster_name],
+            label=f"{cluster_name}",
+            alpha=0.6, s=80, edgecolors='white', linewidth=0.5
+        )
     
     ax1.set_xlabel(f'First Principal Component ({pca.explained_variance_ratio_[0]:.1%} variance)',
                    fontweight='bold', fontsize=12)
@@ -874,39 +865,32 @@ def visualize_clusters_enhanced(customer_features, X_scaled):
     
     # 2. Cluster size distribution
     ax2 = fig.add_subplot(gs[0, 2])
-    cluster_sizes = customer_features['cluster_kmeans'].value_counts().sort_index()
-    bars = ax2.bar(range(len(cluster_sizes)), cluster_sizes.values,
-                   color=[colors[i % len(colors)] for i in range(len(cluster_sizes))],
-                   edgecolor='black', linewidth=1.5, alpha=0.8)
+    cluster_sizes = customer_features['cluster_name'].value_counts()
+    bars = ax2.bar(
+        range(len(cluster_sizes)), cluster_sizes.values,
+        color=[color_map[name] for name in cluster_sizes.index],
+        edgecolor='black', linewidth=1.5, alpha=0.8
+    )
     ax2.set_xlabel('Cluster', fontweight='bold')
     ax2.set_ylabel('Number of Customers', fontweight='bold')
     ax2.set_title('Cluster Size Distribution', fontweight='bold', fontsize=11)
     ax2.set_xticks(range(len(cluster_sizes)))
-    
-    # Get cluster names for x-axis labels
-    cluster_labels = []
-    for idx in cluster_sizes.index:
-        cluster_data = customer_features[customer_features['cluster_kmeans'] == idx]
-        if 'cluster_name' in cluster_data.columns:
-            name = cluster_data['cluster_name'].iloc[0]
-            cluster_labels.append(name.split()[0])  # First word only for space
-        else:
-            cluster_labels.append(f'C{idx}')
-    
-    ax2.set_xticklabels(cluster_labels, rotation=45, ha='right')
+    ax2.set_xticklabels(cluster_sizes.index, rotation=45, ha='right')
     ax2.grid(True, alpha=0.2, axis='y')
     
     # Add value labels on bars
     for i, (bar, value) in enumerate(zip(bars, cluster_sizes.values)):
-        ax2.text(bar.get_x() + bar.get_width()/2, bar.get_height() + max(cluster_sizes.values)*0.02,
-                f'{value:,}', ha='center', va='bottom', fontweight='bold', fontsize=9)
+        ax2.text(
+            bar.get_x() + bar.get_width()/2, bar.get_height() + max(cluster_sizes.values)*0.02,
+            f'{value:,}', ha='center', va='bottom', fontweight='bold', fontsize=9
+        )
     
     plt.tight_layout()
     plt.savefig('customer_clusters_visualization.png', dpi=300, bbox_inches='tight')
     plt.show(block=False)
     print("\n✓ Visualization saved as 'customer_clusters_visualization.png'")
     
-    return pca  # Return pca object for later use
+    return pca
 
 def create_cluster_summary_chart(customer_features):
     """Create a detailed cluster profile heatmap"""
@@ -1043,3 +1027,4 @@ if __name__ == "__main__":
     input("\nPress Enter to close all plots and exit...")
 
     plt.close('all')
+
