@@ -307,17 +307,20 @@ elif page == "📊 Interactive Visualizations":
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
         
         # PCA scatter plot
-        colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A']
-        unique_clusters = sorted(customer_features['cluster_kmeans'].unique())
+        colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8']
+        cluster_names = customer_features['cluster_name'].unique()
+        color_map = {name: colors[i % len(colors)] for i, name in enumerate(cluster_names)}
         
-        for cluster_id in unique_clusters:
-            cluster_data = customer_features[customer_features['cluster_kmeans'] == cluster_id]
-            cluster_name = cluster_data['cluster_name'].iloc[0] if 'cluster_name' in cluster_data.columns else f'Cluster {cluster_id}'
-            ax1.scatter(cluster_data['pca1'], cluster_data['pca2'],
-                       c=colors[cluster_id % len(colors)],
-                       label=f"{cluster_name}",
-                       alpha=0.6, s=80, edgecolors='white', linewidth=0.5)
-        
+        for cluster_name in cluster_names:
+            cluster_data = customer_features[customer_features['cluster_name'] == cluster_name]
+            if cluster_data.empty:
+                continue
+            ax1.scatter(
+                cluster_data['pca1'], cluster_data['pca2'],
+                c=color_map[cluster_name],
+                label=f"{cluster_name}",
+                alpha=0.6, s=80, edgecolors='white', linewidth=0.5
+            )
         ax1.set_xlabel(f'PC1 ({pca.explained_variance_ratio_[0]:.1%} variance)', fontweight='bold')
         ax1.set_ylabel(f'PC2 ({pca.explained_variance_ratio_[1]:.1%} variance)', fontweight='bold')
         ax1.set_title('Customer Segmentation (PCA)', fontweight='bold', fontsize=12)
@@ -325,7 +328,7 @@ elif page == "📊 Interactive Visualizations":
         ax1.grid(True, alpha=0.2)
         
         # Cluster size distribution
-        cluster_sizes = customer_features['cluster_kmeans'].value_counts().sort_index()
+        cluster_sizes = customer_features['cluster_name'].value_counts().sort_index()
         bars = ax2.bar(range(len(cluster_sizes)), cluster_sizes.values,
                        color=[colors[i % len(colors)] for i in range(len(cluster_sizes))],
                        edgecolor='black', linewidth=1.5, alpha=0.8)
@@ -336,7 +339,7 @@ elif page == "📊 Interactive Visualizations":
         
         cluster_labels = []
         for idx in cluster_sizes.index:
-            cluster_data = customer_features[customer_features['cluster_kmeans'] == idx]
+            cluster_data = customer_features[customer_features['cluster_name'] == idx]
             if 'cluster_name' in cluster_data.columns:
                 name = cluster_data['cluster_name'].iloc[0]
                 cluster_labels.append(name.split()[0])
@@ -469,3 +472,4 @@ elif page == "💡 Insight Section":
     st.write("- **Discount Chasers** (23.3%): Show highest price sensitivity at 72.1% average discount")
     st.write("- **Casual Shoppers** (10.4%): Demonstrate moderate spending with premium price points")
     
+
