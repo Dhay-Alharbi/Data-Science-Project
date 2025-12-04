@@ -1,26 +1,24 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
 import numpy as np
+import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
+from sklearn.cluster import KMeans
 import seaborn as sns
 
-# Import your analysis functions
+# Import your analysis functions - updated to match actual file
 from amazon_analysis import (
     load_kaggle_dataset,
-    clean_amazon_data,
-    q1_category_distribution,
-    q2_discount_impact,
-    q3_user_behavior_patterns,
-    prepare_customer_features,
-    perform_kmeans_clustering,
-    visualize_clusters_enhanced,
-    prepare_data_for_cf,
-    build_user_item_matrix,
-    compute_user_similarity,
-    create_cluster_summary_chart,
-    recommend_products
+    clean_data,
+    analyze_categories,
+    analyze_discounts,
+    analyze_user_behavior,
+    build_recommender_system,
+    recommend_products,
+    visualize_clusters,
+    create_cluster_heatmap,
+    cluster_customers
 )
 
 # -----------------------------
@@ -74,29 +72,20 @@ st.markdown("""
 # -----------------------------
 @st.cache_data
 def load_and_clean_data():
-    df, _, _ = load_kaggle_dataset(
-        "karkavelrajaj/amazon-sales-dataset",
-        "amazon.csv",
-        "amazon_data.xlsx"
-    )
-    return clean_amazon_data(df)
-
-@st.cache_data
-def prepare_clustering_data(_df):
-    """Prepare customer clustering data"""
-    customer_features = prepare_customer_features(_df)
-    customer_features, X_scaled, scaler = perform_kmeans_clustering(customer_features, n_clusters=4)
-    return customer_features, X_scaled
+    """Load and clean the dataset"""
+    df = load_kaggle_dataset("karkavelrajaj/amazon-sales-dataset", "amazon.csv")
+    df = clean_data(df)
+    return df
 
 @st.cache_data
 def prepare_recommendation_data(_df):
     """Prepare collaborative filtering data"""
-    cf_df = prepare_data_for_cf(_df)
-    user_item_matrix = build_user_item_matrix(cf_df)
-    similarity_df = compute_user_similarity(user_item_matrix)
-    return cf_df, user_item_matrix, similarity_df
+    user_item_matrix, similarity_df = build_recommender_system(_df)
+    return user_item_matrix, similarity_df
 
-df = load_and_clean_data()
+# Load data
+with st.spinner("Loading data..."):
+    df = load_and_clean_data()
 
 # -----------------------------
 # Sidebar navigation
@@ -163,14 +152,15 @@ elif page == "🔎 Data Preview":
                      'discounted_price', 'actual_price', 'discount_percentage']].head(100)
     
     # Format numeric columns
-    preview_df['rating'] = preview_df['rating'].map('{:.2f}'.format)
-    preview_df['rating_count'] = preview_df['rating_count'].map('{:,}'.format)
-    preview_df['discounted_price'] = preview_df['discounted_price'].map('${:,.2f}'.format)
-    preview_df['actual_price'] = preview_df['actual_price'].map('${:,.2f}'.format)
-    preview_df['discount_percentage'] = preview_df['discount_percentage'].map('{:.0f}%'.format)
+    preview_df_display = preview_df.copy()
+    preview_df_display['rating'] = preview_df_display['rating'].map('{:.2f}'.format)
+    preview_df_display['rating_count'] = preview_df_display['rating_count'].map('{:,.0f}'.format)
+    preview_df_display['discounted_price'] = preview_df_display['discounted_price'].map('₹{:,.2f}'.format)
+    preview_df_display['actual_price'] = preview_df_display['actual_price'].map('₹{:,.2f}'.format)
+    preview_df_display['discount_percentage'] = preview_df_display['discount_percentage'].map('{:.0f}%'.format)
     
     st.dataframe(
-        preview_df,
+        preview_df_display,
         height=400,
         use_container_width=True
     )
@@ -195,10 +185,15 @@ elif page == "📈 Summary Statistics":
     st.dataframe(num_stats, use_container_width=True)
 
     st.subheader("📊 Dataset Overview")
+    
+    # Expand user_ids for unique count
+    df_expanded = df.assign(user_id=df['user_id'].str.split(',')).explode('user_id')
+    df_expanded['user_id'] = df_expanded['user_id'].str.strip()
+    
     cat_summary = pd.DataFrame({
         "Unique Values": [
             df['Main_Category'].nunique(),
-            df['user_id'].nunique(),
+            df_expanded['user_id'].nunique(),
             df['product_name'].nunique(),
             df['review_id'].nunique()
         ]
@@ -275,92 +270,45 @@ elif page == "📊 Interactive Visualizations":
 
     # Visualizations
     st.subheader("📦 Category Distribution")
-    q1_category_distribution(filtered_df)
-    st.pyplot(plt.gcf())
-    plt.clf()
+    with st.spinner("Generating category analysis..."):
+        analyze_categories(filtered_df)
+        for fig_num in plt.get_fignums():
+            st.pyplot(plt.figure(fig_num))
+        plt.close('all')
+    
     st.markdown("---")
     
     st.subheader("💰 Discount Impact on Ratings")
-    q2_discount_impact(filtered_df)
-    st.pyplot(plt.gcf())
-    plt.clf()
+    with st.spinner("Analyzing discount impact..."):
+        analyze_discounts(filtered_df)
+        for fig_num in plt.get_fignums():
+            st.pyplot(plt.figure(fig_num))
+        plt.close('all')
+    
     st.markdown("---")
     
-    st.subheader("👥 Customer Behavior & Customer Segments")
-    q3_user_behavior_patterns(filtered_df)
-    st.pyplot(plt.gcf())
-    plt.clf()
+    st.subheader("👥 User Behavior Patterns")
+    with st.spinner("Analyzing user behavior..."):
+        analyze_user_behavior(filtered_df)
+        for fig_num in plt.get_fignums():
+            st.pyplot(plt.figure(fig_num))
+        plt.close('all')
     
-    # Add Customer Clustering Visualization
+    st.markdown("---")
+    
+    # Customer Clustering Visualization 
     st.subheader("🎯 Customer Segmentation Clusters")
-    
-    with st.spinner("Preparing customer clustering analysis..."):
-        customer_features, X_scaled = prepare_clustering_data(filtered_df)
-        
-        # Create PCA visualization
-        pca = PCA(n_components=2)
-        X_pca = pca.fit_transform(X_scaled)
-        customer_features['pca1'] = X_pca[:, 0]
-        customer_features['pca2'] = X_pca[:, 1]
-        
-        # Plot clusters
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
-        
-        # PCA scatter plot
-        colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8']
-        cluster_names = customer_features['cluster_name'].unique()
-        color_map = {name: colors[i % len(colors)] for i, name in enumerate(cluster_names)}
-        
-        for cluster_name in cluster_names:
-            cluster_data = customer_features[customer_features['cluster_name'] == cluster_name]
-            if cluster_data.empty:
-                continue
-            ax1.scatter(
-                cluster_data['pca1'], cluster_data['pca2'],
-                c=color_map[cluster_name],
-                label=f"{cluster_name}",
-                alpha=0.6, s=80, edgecolors='white', linewidth=0.5
-            )
-        ax1.set_xlabel(f'PC1 ({pca.explained_variance_ratio_[0]:.1%} variance)', fontweight='bold')
-        ax1.set_ylabel(f'PC2 ({pca.explained_variance_ratio_[1]:.1%} variance)', fontweight='bold')
-        ax1.set_title('Customer Segmentation (PCA)', fontweight='bold', fontsize=12)
-        ax1.legend(loc='best', fontsize=9)
-        ax1.grid(True, alpha=0.2)
-        
-        # Cluster size distribution
-        cluster_sizes = customer_features['cluster_name'].value_counts().sort_index()
-        bars = ax2.bar(range(len(cluster_sizes)), cluster_sizes.values,
-                       color=[colors[i % len(colors)] for i in range(len(cluster_sizes))],
-                       edgecolor='black', linewidth=1.5, alpha=0.8)
-        ax2.set_xlabel('Cluster', fontweight='bold')
-        ax2.set_ylabel('Number of Customers', fontweight='bold')
-        ax2.set_title('Cluster Size Distribution', fontweight='bold', fontsize=12)
-        ax2.set_xticks(range(len(cluster_sizes)))
-        
-        cluster_labels = []
-        for idx in cluster_sizes.index:
-            cluster_data = customer_features[customer_features['cluster_name'] == idx]
-            if 'cluster_name' in cluster_data.columns:
-                name = cluster_data['cluster_name'].iloc[0]
-                cluster_labels.append(name.split()[0])
-            else:
-                cluster_labels.append(f'C{idx}')
-        
-        ax2.set_xticklabels(cluster_labels, rotation=45, ha='right')
-        ax2.grid(True, alpha=0.2, axis='y')
-        
-        for bar, value in zip(bars, cluster_sizes.values):
-            ax2.text(bar.get_x() + bar.get_width()/2, bar.get_height() + max(cluster_sizes.values)*0.02,
-                    f'{value:,}', ha='center', va='bottom', fontweight='bold', fontsize=9)
-        
-        plt.tight_layout()
-        st.pyplot(fig)
-        plt.clf()
-        
-        with st.spinner("Generating cluster heatmap..."):
-            heatmap_fig = create_cluster_summary_chart(customer_features)
-            st.pyplot(heatmap_fig)
+    with st.spinner("Customer Segmentation Clusters..."):
+        customer_features, X_scaled = cluster_customers(filtered_df)
 
+        if X_scaled is not None:
+            fig_clusters = visualize_clusters(customer_features, X_scaled)
+            st.pyplot(fig_clusters)
+
+            fig_heatmap = create_cluster_heatmap(customer_features)
+            st.pyplot(fig_heatmap)
+        else:
+            st.warning("Not enough repeat buyers to generate clusters.")
 
 # -----------------------------
 # Page: Product Recommendations
@@ -377,7 +325,7 @@ elif page == "🎯 Product Recommendations":
     """)
     
     with st.spinner("Preparing recommendation system..."):
-        cf_df, user_item_matrix, similarity_df = prepare_recommendation_data(df)
+        user_item_matrix, similarity_df = prepare_recommendation_data(df)
     
     # User selection
     st.subheader("👤 Select User")
@@ -405,38 +353,28 @@ elif page == "🎯 Product Recommendations":
                 recommendations = recommend_products(
                     selected_user, 
                     user_item_matrix, 
-                    similarity_df, 
+                    similarity_df,
+                    df,
                     n_recommendations=n_recommendations
                 )
                 
-                # Merge with product details
-                rec_with_details = recommendations.merge(
-                    df[['product_id', 'product_name', 'rating', 'discounted_price', 'Main_Category']].drop_duplicates('product_id'),
-                    on='product_id',
-                    how='left'
-                )
-                
-                st.success(f"✅ Found {len(recommendations)} recommendations for user {selected_user}")
-                
-
-                # Display recommendations
-                st.subheader("🔍Recommended Products")
-                
-                for idx, row in rec_with_details.iterrows():
-                    with st.container():
-                        st.markdown(f"""
-                        <div class="recommendation-card">
-                            <h4>#{idx + 1} - {row['product_name'][:100]}{'...' if len(str(row['product_name'])) > 100 else ''}</h4>
-                            <p><strong>Product ID:</strong> {row['product_id']}</p>
-                            <p><strong>Category:</strong> {row['Main_Category']}</p>
-                            <p><strong>Current Rating:</strong> ⭐ {row['rating']:.2f}</p>
-                            <p><strong>Price:</strong> ₹{row['discounted_price']:,.2f}</p>
-                        </div>
-                        """, unsafe_allow_html=True)
-                
-                # Download recommendations
-                st.markdown("---")
-
+                if recommendations.empty:
+                    st.warning(f"⚠️ No recommendations available for user {selected_user}")
+                else:
+                    st.success(f"✅ Found {len(recommendations)} recommendations for user {selected_user}")
+                    
+                    # Display recommendations
+                    st.subheader("🔍 Recommended Products")
+                    
+                    for idx, row in recommendations.iterrows():
+                        with st.container():
+                            st.markdown(f"""
+                            <div class="recommendation-card">
+                                <h4>#{idx + 1} - {row['product_name'][:100]}{'...' if len(str(row['product_name'])) > 100 else ''}</h4>
+                                <p><strong>Product ID:</strong> {row['product_id']}</p>
+                                <p><strong>Rating:</strong> ⭐ {row['rating']:.2f}</p>
+                            </div>
+                            """, unsafe_allow_html=True)
                 
             except Exception as e:
                 st.error(f"❌ Error generating recommendations: {str(e)}")
@@ -469,7 +407,5 @@ elif page == "💡 Insight Section":
     st.write("- Frequent reviewers rate slightly higher.")
     st.write("- **Loyal Customers** (3.9%): Spend **₹29,084** on average (25x more than one-time buyers)")
     st.write("- **One-Time Buyers** (62.4%): Represent the largest segment with low engagement")
-    st.write("- **Discount Chasers** (23.3%): Show highest price sensitivity at 72.1% average discount")
+    st.write("- **Discount Seekers** (23.3%): Show highest price sensitivity at 72.1% average discount")
     st.write("- **Casual Shoppers** (10.4%): Demonstrate moderate spending with premium price points")
-    
-
