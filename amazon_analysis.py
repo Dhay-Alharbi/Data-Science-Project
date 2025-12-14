@@ -661,7 +661,7 @@ def create_cluster_heatmap(customer_features):
     cluster_profiles_norm = (cluster_profiles - cluster_profiles.min()) / (cluster_profiles.max() - cluster_profiles.min())
     fig, ax = plt.subplots(figsize=(12, 6))
     sns.heatmap(cluster_profiles_norm.T, annot=cluster_profiles.T.values, fmt='.1f', cmap='YlOrRd', linewidths=2, linecolor='white', ax=ax)
-    ax.set_title('Cluster Profile Heatmap\n(Actual values with relative intensity)')
+    ax.set_title('Heatmap\n(Actual values with relative intensity)')
     ax.set_xlabel('Customer Segments')
     ax.set_ylabel('Behavioral Metrics')
     plt.tight_layout()
@@ -711,3 +711,4 @@ if __name__ == "__main__":
     print("="*80)
     input("\nPress Enter to close all plots and exit...")
     plt.close('all')
+
